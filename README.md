@@ -28,3 +28,30 @@ BO	    业务对象	    封装复杂业务逻辑数据	        不一定
 @RequestMapping 的作用是：
 把浏览器或前端发来的 HTTP 请求，映射到指定的 Controller 类或方法上。
 简单说，它用来定义接口路径。
+
+4.30
+新增员工模块开发完成
+
+功能说明：
+- 接口路径：POST /admin/employee
+- 功能描述：管理员新增员工账号
+- 默认密码：123456（MD5加密存储）
+- 默认状态：启用（status=1）
+
+开发步骤：
+1. EmployeeMapper接口 → 添加insert方法（使用@Insert注解）
+2. EmployeeService接口 → 添加save(EmployeeDTO)方法
+3. EmployeeServiceImpl → 实现save业务逻辑
+   - DTO转Entity（BeanUtils.copyProperties）
+   - 设置默认状态为启用
+   - 设置默认密码并MD5加密
+   - 设置创建时间、更新时间
+   - 从BaseContext获取当前登录用户ID，设置createUser和updateUser
+   - 调用Mapper插入数据库
+4. EmployeeController → 添加@PostMapping("/")接口
+
+关键代码位置：
+- Mapper: sky-server/src/main/java/com/sky/mapper/EmployeeMapper.java
+- Service接口: sky-server/src/main/java/com/sky/service/EmployeeService.java
+- Service实现: sky-server/src/main/java/com/sky/service/impl/EmployeeServiceImpl.java
+- Controller: sky-server/src/main/java/com/sky/controller/admin/EmployeeController.java
