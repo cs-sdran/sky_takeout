@@ -1,6 +1,6 @@
 
 # sky-take-out
-更新于2026-4-26
+更新于2026-5-1
 sky-take-out        整个项目根目录 / Maven 父工程
 
 .idea              IDEA 工具配置目录，不是业务代码
@@ -55,3 +55,28 @@ BO	    业务对象	    封装复杂业务逻辑数据	        不一定
 - Service接口: sky-server/src/main/java/com/sky/service/EmployeeService.java
 - Service实现: sky-server/src/main/java/com/sky/service/impl/EmployeeServiceImpl.java
 - Controller: sky-server/src/main/java/com/sky/controller/admin/EmployeeController.java
+
+5.1
+员工分页查询功能开发完成
+
+## 分页查询功能说明
+### 接口信息
+- 接口路径：GET /admin/employee/page
+- 功能描述：按页码和每页数量查询员工列表
+- 请求参数：page(页码), pageSize(每页大小)
+- 返回数据：总记录数和员工列表数据
+
+### 开发步骤
+1. EmployeeMapper接口 → 添加pageQuery方法，使用PageHelper进行分页
+2. EmployeeService接口 → 添加pageQuery(EmployeePageQueryDTO)方法
+3. EmployeeServiceImpl → 实现pageQuery业务逻辑
+   - 使用PageHelper.startPage()设置分页参数
+   - 调用Mapper的pageQuery方法获取分页数据
+   - 封装PageResult对象返回总记录数和数据列表
+4. EmployeeController → 添加@GetMapping("/page")接口
+
+### 技术要点
+- PageHelper分页：集成PageHelper实现物理分页查询
+- DTO传参：使用EmployeePageQueryDTO接收分页参数
+- 统一返回：使用PageResult封装分页结果
+- 日志记录：记录分页查询请求参数
