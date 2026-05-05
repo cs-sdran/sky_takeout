@@ -236,6 +236,115 @@ void insert(Employee employee);
 // Service 层无需任何额外代码
 ```
 
+### 2. 菜品管理模块
+
+#### 2.1 新增菜品 ⭐⭐ (5月5日完成)
+- **接口路径**: `POST /admin/dish`
+- **功能描述**: 管理员新增菜品信息，包括基本信息和口味数据
+- **涉及表**: 
+  - `dish`: 菜品基本信息表
+  - `dish_flavor`: 菜品口味关系表
+- **请求参数**:
+  - name: 菜品名称
+  - categoryId: 菜品分类ID
+  - price: 菜品价格
+  - image: 菜品图片URL
+  - description: 菜品描述
+  - status: 菜品状态（0-停售，1-起售）
+  - flavors: 口味列表（可选）
+    - name: 口味名称
+    - value: 口味数据
+- **业务规则**:
+  - 使用事务保证数据一致性
+  - 先插入菜品基本信息，再批量插入关联的口味数据
+  - 自动填充创建时间、更新时间、创建人、更新人等审计字段
+
+**实现细节**:
+```java
+// Controller层
+@RestController
+@RequestMapping("/admin/dish")
+@Api(tags = "菜品管理接口")
+@Slf4j
+public class DishController {
+    @Autowired
+    private DishService dishService;
+    
+    /**
+     * 新增菜品
+     * @return
+     */
+    @PostMapping
+    @ApiOperation("新增菜品")
+    public Result save(@RequestBody DishDTO dishDTO) {
+        log.info("新增菜品：{}",dishDTO);
+        dishService.saveWithFlavor(dishDTO);
+        return Result.success();
+    }
+}
+
+// Service层
+@Service
+@Slf4j
+public class DishServiceImpl implements DishService {
+    @Autowired
+    private DishMapper dishMapper;
+    @Autowired
+    private DishFlavorMapper dishFlavorMapper;
+    
+    @Override
+    @Transactional
+    public void saveWithFlavor(DishDTO dishDTO) {
+        // 1. 将DTO转换为Entity并插入菜品基本信息
+        Dish dish = new Dish();
+        BeanUtils.copyProperties(dishDTO, dish);
+        dishMapper.insert(dish);
+
+        // 2. 获取生成的菜品ID
+        Long dishId = dish.getId();
+        
+        // 3. 处理口味数据
+        List<DishFlavor> flavors = dishDTO.getFlavors();
+        if (flavors != null && flavors.size() > 0) {
+            // 设置每个口味的菜品ID
+            for (DishFlavor flavor : flavors) {
+                flavor.setDishId(dishId);
+            }
+            // 批量插入口味数据
+            dishFlavorMapper.insertBatch(flavors);
+        }
+    }
+}
+
+// Mapper层
+@Mapper
+public interface DishMapper {
+    /**
+     * 插入菜品数据
+     * @param dish
+     */
+    @AutoFill(value = OperationType.INSERT)
+    void insert(Dish dish);
+}
+
+@Mapper
+public interface DishFlavorMapper {
+    /**
+     * 批量插入口味数据
+     * @param flavors
+     */
+    @AutoFill(value = OperationType.INSERT)
+    void insertBatch(List<DishFlavor> flavors);
+}
+```
+
+**技术亮点**:
+- ✨ **事务管理**: 使用@Transactional注解确保菜品和口味数据的一致性
+- ✨ **批量操作**: 口味数据采用批量插入提高性能
+- ✨ **自动填充**: 利用AOP自动填充审计字段，减少重复代码
+- ✨ **数据传输对象**: 使用DishDTO接收前端复杂数据结构
+- ✨ **属性拷贝**: 使用BeanUtils简化DTO到Entity的转换
+
 ## 关键技术点
 
 ### 1. JWT 认证机制
@@ -300,11 +409,14 @@ void insert(Employee employee);
 - ✅ 5月3日: 启用/禁用员工账号功能
 - ✅ 5月3日: 编辑员工信息功能
 - ✅ 5月4日: 公共字段自动填充功能（AOP实现）
+- ✅ 5月5日: 菜品添加功能（含口味管理）
 
 ### 待开发功能
+- ⏳ 菜品查询功能
+- ⏳ 菜品修改功能
+- ⏳ 菜品删除功能
 - ⏳ 员工删除功能
 - ⏳ 密码修改功能
-- ⏳ 菜品管理模块
 - ⏳ 套餐管理模块
 - ⏳ 订单管理模块
 - ⏳ 数据统计模块
@@ -357,7 +469,13 @@ http://localhost:8080/doc.html
 
 ## 更新日志
 
-### 2026-05-04 (今日)
+### 2026-05-05
+- ✨ 新增：菜品添加功能（支持口味管理）
+- 🔧 实现：事务控制保证菜品和口味数据一致性
+- 📝 完善：批量插入口味数据提高性能
+- 🎯 应用：继续使用AOP自动填充审计字段
+
+### 2026-05-04
 - ✨ 新增：公共字段自动填充功能（AOP + 自定义注解 + 反射）
 - 🔧 优化：移除 Service 层手动设置审计字段的重复代码
 - 📝 完善：在 EmployeeMapper 和 CategoryMapper 中添加 @AutoFill 注解
@@ -380,4 +498,4 @@ http://localhost:8080/doc.html
 
 ---
 
-**最后更新**: 2026-05-04
+**最后更新**: 2026-05-05
