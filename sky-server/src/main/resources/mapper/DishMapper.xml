@@ -11,4 +11,30 @@
    </insert>
 
 
+    <select id="pageQuery" resultType="com.sky.vo.DishVO">
+        select d.*,c.name as categoryName from dish d left outer join category c on d.category_id = c.id
+        <where>
+            <if test="name != null and name != ''">
+                and d.name like CONCAT('%', #{name}, '%')
+            </if>
+            <if test="categoryId != null">
+                and d.category_id = #{categoryId}
+            </if>
+            <if test="status != null">
+                and d.status = #{status}
+            </if>
+        </where>
+        order by d.update_time desc
+    </select>
+
+    <delete id="deleteByIds">
+        delete from dish where id in
+        <foreach item="id" collection="ids" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+
+
+
 </mapper>

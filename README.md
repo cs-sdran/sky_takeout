@@ -1,3 +1,4 @@
+
 # Sky Takeout - 外卖管理系统
 
 ## 项目简介
@@ -220,7 +221,7 @@ void update(Employee employee);
 **优化效果对比**:
 
 使用前（需要手动设置）:
-### java
+java
 // Service 层每个方法都要写
 employee.setCreateTime(LocalDateTime.now());
 employee.setUpdateTime(LocalDateTime.now());
@@ -229,7 +230,7 @@ employee.setUpdateUser(BaseContext.getCurrentId());
 ```
 
 使用后（自动填充）:
-```java
+java
 // 只需在 Mapper 方法上加注解
 @AutoFill(value = OperationType.INSERT)
 void insert(Employee employee);
@@ -345,6 +346,132 @@ public interface DishFlavorMapper {
 - ✨ **数据传输对象**: 使用DishDTO接收前端复杂数据结构
 - ✨ **属性拷贝**: 使用BeanUtils简化DTO到Entity的转换
 
+#### 2.2 菜品分页查询 ⭐⭐ (5月6日完成)
+- **接口路径**: `GET /admin/dish/page`
+- **功能描述**: 按条件分页查询菜品列表
+- **请求参数**: 
+  - page: 页码
+  - pageSize: 每页大小
+  - name: 菜品名称（可选，支持模糊查询）
+  - categoryId: 菜品分类ID（可选）
+  - status: 菜品状态（可选，0-停售，1-起售）
+- **返回数据**: 总记录数和菜品列表数据（包含分类名称）
+- **技术实现**: 使用 PageHelper 实现物理分页，联表查询获取分类名称
+
+**实现细节**:
+java
+// Controller层
+@GetMapping("/page")
+@ApiOperation("分页查询")
+public Result<PageResult> page(DishPageQueryDTO dishPageQueryDTO) {
+    log.info("分页查询：{}",dishPageQueryDTO);
+    PageResult pageResult = dishService.pageQuery(dishPageQueryDTO);
+    return Result.success(pageResult);
+}
+
+// Service层
+@Override
+public PageResult pageQuery(DishPageQueryDTO dishPageQueryDTO) {
+    PageHelper.startPage(dishPageQueryDTO.getPage(), dishPageQueryDTO.getPageSize());
+    Page<DishVO> page = dishMapper.pageQuery(dishPageQueryDTO);
+    return new PageResult(page.getTotal(), page.getResult());
+}
+
+// Mapper层
+Page<DishVO> pageQuery(DishPageQueryDTO dishPageQueryDTO);
+
+// XML映射文件
+<select id="pageQuery" resultType="com.sky.vo.DishVO">
+    select d.*,c.name as categoryName from dish d left outer join category c on d.category_id = c.id
+    <where>
+        <if test="name != null and name != ''">
+            and d.name like CONCAT('%', #{name}, '%')
+        </if>
+        <if test="categoryId != null">
+            and d.category_id = #{categoryId}
+        </if>
+        <if test="status != null">
+            and d.status = #{status}
+        </if>
+    </where>
+    order by d.update_time desc
+</select>
+```
+
+**技术亮点**:
+- ✨ **动态SQL**: 根据传入参数动态构建查询条件
+- ✨ **联表查询**: 通过left join获取菜品对应的分类名称
+- ✨ **模糊查询**: 支持按菜品名称进行模糊搜索
+- ✨ **分页插件**: 使用PageHelper实现高效分页
+- ✨ **视图对象**: 使用DishVO返回包含分类名称的完整信息
+
+#### 2.3 菜品删除 ⭐⭐ (5月6日完成)
+- **接口路径**: `DELETE /admin/dish`
+- **功能描述**: 批量删除菜品及其关联的口味数据
+- **请求参数**: ids: 菜品ID列表
+- **业务规则**:
+  - 起售中的菜品不能删除
+  - 被套餐关联的菜品不能删除
+  - 删除菜品时同步删除关联的口味数据
+  - 使用事务保证数据一致性
+
+**实现细节**:
+```java
+// Controller层
+@DeleteMapping
+@ApiOperation("批量删除菜品")
+public Result delete(@RequestParam List<Long> ids) {
+    log.info("批量删除菜品：{}",ids);
+    dishService.deleteBatch(ids);
+    return Result.success();
+}
+
+// Service层
+@Override
+@Transactional
+public void deleteBatch(List<Long> ids) {
+    // 1. 判断菜品状态
+    for (Long id : ids) {
+        Dish dish = dishMapper.getById(id);
+        if (dish.getStatus() == StatusConstant.ENABLE) {
+            // 起售中的菜品不能删除
+            throw new DeletionNotAllowedException(MessageConstant.DISH_ON_SALE);
+        }
+    }
+
+    // 2. 判断是否被套餐关联
+    List<Long> setmealIds = setmealDishMapper.getSetmealIdsByDishIds(ids);
+    if (setmealIds != null && setmealIds.size() > 0) {
+        // 当前菜品有被套餐关联，不能删除
+        throw new DeletionNotAllowedException(MessageConstant.DISH_BE_RELATED_BY_SETMEAL);
+    }
+
+    // 3. 删除菜品
+    dishMapper.deleteByIds(ids);
+
+    // 4. 删除菜品关联的口味数据
+    dishFlavorMapper.deleteByDishIds(ids);
+}
+
+// Mapper层
+void deleteByIds(List<Long> ids);
+
+// XML映射文件
+  <delete id="deleteByIds">
+      delete from dish where id in
+      <foreach item="id" collection="ids" open="(" separator="," close=")">
+          #{id}
+      </foreach>
+  </delete>
+```
+
+**技术亮点**:
+- ✨ **事务管理**: 使用@Transactional确保菜品和口味数据同时删除
+- ✨ **业务校验**: 删除前检查菜品状态和套餐关联关系
+- ✨ **批量删除**: 使用MyBatis foreach实现批量删除
+- ✨ **异常处理**: 对不允许删除的情况抛出业务异常
+- ✨ **数据完整性**: 保证主表和关联表数据的一致性
+
 ## 关键技术点
 
 ### 1. JWT 认证机制
@@ -410,6 +537,8 @@ public interface DishFlavorMapper {
 - ✅ 5月3日: 编辑员工信息功能
 - ✅ 5月4日: 公共字段自动填充功能（AOP实现）
 - ✅ 5月5日: 菜品添加功能（含口味管理）
+- ✅ 5月6日: 菜品分页查询功能
+- ✅ 5月6日: 菜品删除功能
 
 ### 待开发功能
 - ⏳ 菜品查询功能
@@ -469,6 +598,14 @@ http://localhost:8080/doc.html
 
 ## 更新日志
 
+### 2026-05-06
+- ✨ 新增：菜品分页查询功能（支持多条件筛选）
+- ✨ 新增：菜品删除功能（支持批量删除）
+- 🔧 实现：动态SQL构建查询条件，支持模糊搜索
+- 📝 完善：联表查询获取分类名称，提升用户体验
+- 🔒 优化：删除前进行业务校验，确保数据完整性
+- 🎯 应用：继续使用事务管理保证数据一致性
+
 ### 2026-05-05
 - ✨ 新增：菜品添加功能（支持口味管理）
 - 🔧 实现：事务控制保证菜品和口味数据一致性
@@ -498,4 +635,4 @@ http://localhost:8080/doc.html
 
 ---
 
-**最后更新**: 2026-05-05
+**最后更新**: 2026-05-06
