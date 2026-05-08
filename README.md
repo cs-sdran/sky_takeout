@@ -396,7 +396,7 @@ Page<DishVO> pageQuery(DishPageQueryDTO dishPageQueryDTO);
     </where>
     order by d.update_time desc
 </select>
-```
+
 
 **技术亮点**:
 - ✨ **动态SQL**: 根据传入参数动态构建查询条件
@@ -416,7 +416,8 @@ Page<DishVO> pageQuery(DishPageQueryDTO dishPageQueryDTO);
   - 使用事务保证数据一致性
 
 **实现细节**:
-```java
+java
+
 // Controller层
 @DeleteMapping
 @ApiOperation("批量删除菜品")
@@ -471,6 +472,76 @@ void deleteByIds(List<Long> ids);
 - ✨ **批量删除**: 使用MyBatis foreach实现批量删除
 - ✨ **异常处理**: 对不允许删除的情况抛出业务异常
 - ✨ **数据完整性**: 保证主表和关联表数据的一致性
+
+#### 2.4 修改菜品 ⭐⭐ (5月8日完成)
+- **接口路径**: `PUT /admin/dish`
+- **功能描述**: 管理员修改菜品基本信息和口味数据
+- **涉及表**: 
+  - `dish`: 菜品基本信息表
+  - `dish_flavor`: 菜品口味关系表
+- **请求参数**:
+  - id: 菜品ID
+  - name: 菜品名称
+  - categoryId: 菜品分类ID
+  - price: 菜品价格
+  - image: 菜品图片URL
+  - description: 菜品描述
+  - status: 菜品状态（0-停售，1-起售）
+  - flavors: 口味列表（可选）
+    - name: 口味名称
+    - value: 口味数据
+- **业务规则**:
+  - 使用事务保证数据一致性
+  - 先更新菜品基本信息，再删除原有口味数据，最后插入新的口味数据
+  - 自动填充更新时间、更新人等审计字段
+
+**实现细节**:
+```java
+// Controller层
+@PutMapping
+@ApiOperation("修改菜品")
+public Result update(@RequestBody DishDTO dishDTO) {
+    log.info("修改菜品：{}",dishDTO);
+    dishService.updateWithFlavor(dishDTO);
+    return Result.success();
+}
+
+// Service层
+@Override
+@Transactional
+public void updateWithFlavor(DishDTO dishDTO) {
+    // 1. 将DTO转换为Entity并更新菜品基本信息
+    Dish dish = new Dish();
+    BeanUtils.copyProperties(dishDTO, dish);
+    dishMapper.update(dish);
+
+    // 2. 删除原有的口味数据
+    dishFlavorMapper.deleteByDishId(dishDTO.getId());
+
+    // 3. 处理新的口味数据
+    List<DishFlavor> flavors = dishDTO.getFlavors();
+    if (flavors != null && flavors.size() > 0) {
+        // 设置每个口味的菜品ID
+        for (DishFlavor flavor : flavors) {
+            flavor.setDishId(dishDTO.getId());
+        }
+        // 批量插入新的口味数据
+        dishFlavorMapper.insertBatch(flavors);
+    }
+}
+
+// Mapper层
+@AutoFill(value = OperationType.UPDATE)
+void update(Dish dish);
+```
+
+**技术亮点**:
+- ✨ **事务管理**: 使用@Transactional注解确保菜品和口味数据的一致性
+- ✨ **先删后增**: 采用先删除原有口味再插入新口味的方式简化逻辑
+- ✨ **批量操作**: 口味数据采用批量插入提高性能
+- ✨ **自动填充**: 利用AOP自动填充审计字段，减少重复代码
+- ✨ **数据传输对象**: 使用DishDTO接收前端复杂数据结构
+- ✨ **属性拷贝**: 使用BeanUtils简化DTO到Entity的转换
 
 ## 关键技术点
 
@@ -539,6 +610,7 @@ void deleteByIds(List<Long> ids);
 - ✅ 5月5日: 菜品添加功能（含口味管理）
 - ✅ 5月6日: 菜品分页查询功能
 - ✅ 5月6日: 菜品删除功能
+- ✅ 5月8日: 菜品修改功能（含口味管理）
 
 ### 待开发功能
 - ⏳ 菜品查询功能
@@ -598,6 +670,12 @@ http://localhost:8080/doc.html
 
 ## 更新日志
 
+### 2026-05-08
+- ✨ 新增：菜品修改功能（支持口味数据更新）
+- 🔧 实现：先删后增策略处理口味数据变更
+- 📝 完善：事务控制保证菜品和口味数据一致性
+- 🎯 应用：继续使用AOP自动填充审计字段
+
 ### 2026-05-06
 - ✨ 新增：菜品分页查询功能（支持多条件筛选）
 - ✨ 新增：菜品删除功能（支持批量删除）
@@ -635,4 +713,4 @@ http://localhost:8080/doc.html
 
 ---
 
-**最后更新**: 2026-05-06
+**最后更新**: 2026-05-08
