@@ -467,7 +467,7 @@ void deleteByIds(List<Long> ids);
 ```
 
 **技术亮点**:
-- ✨ **事务管理**: 使用@Transactional确保菜品和口味数据同时删除
+- ✨ **事务管理**: 使用  确保菜品和口味数据同时删除
 - ✨ **业务校验**: 删除前检查菜品状态和套餐关联关系
 - ✨ **批量删除**: 使用MyBatis foreach实现批量删除
 - ✨ **异常处理**: 对不允许删除的情况抛出业务异常
@@ -543,6 +543,235 @@ void update(Dish dish);
 - ✨ **数据传输对象**: 使用DishDTO接收前端复杂数据结构
 - ✨ **属性拷贝**: 使用BeanUtils简化DTO到Entity的转换
 
+### 3. 套餐管理模块
+
+#### 3.1 新增套餐 ⭐⭐ (5月17日完成)
+- **接口路径**: `POST /admin/setmeal`
+- **功能描述**: 管理员新增套餐信息，包括基本信息和关联的菜品数据
+- **涉及表**: 
+  - `setmeal`: 套餐基本信息表
+  - `setmeal_dish`: 套餐菜品关系表
+- **请求参数**:
+  - name: 套餐名称
+  - categoryId: 套餐分类ID
+  - price: 套餐价格
+  - image: 套餐图片URL
+  - description: 套餐描述
+  - status: 套餐状态（0-停售，1-起售）
+  - setmealDishes: 套餐菜品列表
+    - dishId: 菜品ID
+    - name: 菜品名称
+    - price: 菜品单价
+    - copies: 份数
+- **业务规则**:
+  - 使用事务保证数据一致性
+  - 先插入套餐基本信息，再批量插入关联的菜品数据
+  - 自动填充创建时间、更新时间、创建人、更新人等审计字段
+
+**实现细节**:
+```java
+// Controller层
+@RestController
+@RequestMapping("/admin/setmeal")
+@Api(tags = "套餐管理接口")
+@Slf4j
+public class SetmealController {
+    @Autowired
+    private SetmealService setmealService;
+    
+    /**
+     * 新增套餐
+     * @return
+     */
+    @PostMapping
+    @ApiOperation("新增套餐")
+    public Result save(@RequestBody SetmealDTO setmealDTO) {
+        log.info("新增套餐：{}",setmealDTO);
+        setmealService.saveWithDish(setmealDTO);
+        return Result.success();
+    }
+}
+
+// Service层
+@Service
+@Slf4j
+public class SetmealServiceImpl implements SetmealService {
+    @Autowired
+    private SetmealMapper setmealMapper;
+    @Autowired
+    private SetmealDishMapper setmealDishMapper;
+    
+    @Override
+    @Transactional
+    public void saveWithDish(SetmealDTO setmealDTO) {
+        // 1. 将DTO转换为Entity并插入套餐基本信息
+        Setmeal setmeal = new Setmeal();
+        BeanUtils.copyProperties(setmealDTO, setmeal);
+        setmealMapper.insert(setmeal);
+
+        // 2. 获取生成的套餐ID
+        Long setmealId = setmeal.getId();
+        
+        // 3. 处理套餐菜品数据
+        List<SetmealDish> setmealDishes = setmealDTO.getSetmealDishes();
+        if (setmealDishes != null && setmealDishes.size() > 0) {
+            // 设置每个菜品的套餐ID
+            for (SetmealDish setmealDish : setmealDishes) {
+                setmealDish.setSetmealId(setmealId);
+            }
+            // 批量插入套餐菜品数据
+            setmealDishMapper.insertBatch(setmealDishes);
+        }
+    }
+}
+
+// Mapper层
+@Mapper
+public interface SetmealMapper {
+    /**
+     * 插入套餐数据
+     * @param setmeal
+     */
+    @AutoFill(value = OperationType.INSERT)
+    void insert(Setmeal setmeal);
+}
+
+@Mapper
+public interface SetmealDishMapper {
+    /**
+     * 批量插入套餐菜品数据
+     * @param setmealDishes
+     */
+    @AutoFill(value = OperationType.INSERT)
+    void insertBatch(List<SetmealDish> setmealDishes);
+}
+```
+
+**技术亮点**:
+- ✨ **事务管理**: 使用@Transactional注解确保套餐和菜品数据的一致性
+- ✨ **批量操作**: 套餐菜品数据采用批量插入提高性能
+- ✨ **自动填充**: 利用AOP自动填充审计字段，减少重复代码
+- ✨ **数据传输对象**: 使用SetmealDTO接收前端复杂数据结构
+- ✨ **属性拷贝**: 使用BeanUtils简化DTO到Entity的转换
+
+#### 3.2 套餐分页查询 ⭐⭐ (5月17日完成)
+- **接口路径**: `GET /admin/setmeal/page`
+- **功能描述**: 按条件分页查询套餐列表
+- **请求参数**: 
+  - page: 页码
+  - pageSize: 每页大小
+  - name: 套餐名称（可选，支持模糊查询）
+  - categoryId: 套餐分类ID（可选）
+  - status: 套餐状态（可选，0-停售，1-起售）
+- **返回数据**: 总记录数和套餐列表数据（包含分类名称）
+- **技术实现**: 使用 PageHelper 实现物理分页，联表查询获取分类名称
+
+**实现细节**:
+```java
+// Controller层
+@GetMapping("/page")
+@ApiOperation("分页查询")
+public Result<PageResult> page(SetmealPageQueryDTO setmealPageQueryDTO) {
+    log.info("分页查询：{}",setmealPageQueryDTO);
+    PageResult pageResult = setmealService.pageQuery(setmealPageQueryDTO);
+    return Result.success(pageResult);
+}
+
+// Service层
+@Override
+public PageResult pageQuery(SetmealPageQueryDTO setmealPageQueryDTO) {
+    PageHelper.startPage(setmealPageQueryDTO.getPage(), setmealPageQueryDTO.getPageSize());
+    Page<SetmealVO> page = setmealMapper.pageQuery(setmealPageQueryDTO);
+    return new PageResult(page.getTotal(), page.getResult());
+}
+
+// Mapper层
+Page<SetmealVO> pageQuery(SetmealPageQueryDTO setmealPageQueryDTO);
+
+// XML映射文件
+<select id="pageQuery" resultType="com.sky.vo.SetmealVO">
+    select s.*,c.name as categoryName from setmeal s left outer join category c on s.category_id = c.id
+    <where>
+        <if test="name != null and name != ''">
+            and s.name like CONCAT('%', #{name}, '%')
+        </if>
+        <if test="categoryId != null">
+            and s.category_id = #{categoryId}
+        </if>
+        <if test="status != null">
+            and s.status = #{status}
+        </if>
+    </where>
+    order by s.update_time desc
+</select>
+```
+
+**技术亮点**:
+- ✨ **动态SQL**: 根据传入参数动态构建查询条件
+- ✨ **联表查询**: 通过left join获取套餐对应的分类名称
+- ✨ **模糊查询**: 支持按套餐名称进行模糊搜索
+- ✨ **分页插件**: 使用PageHelper实现高效分页
+- ✨ **视图对象**: 使用SetmealVO返回包含分类名称的完整信息
+
+#### 3.3 套餐删除 ⭐⭐ (5月17日完成)
+- **接口路径**: `DELETE /admin/setmeal`
+- **功能描述**: 批量删除套餐及其关联的菜品数据
+- **请求参数**: ids: 套餐ID列表
+- **业务规则**:
+  - 起售中的套餐不能删除
+  - 删除套餐时同步删除关联的菜品数据
+  - 使用事务保证数据一致性
+
+**实现细节**:
+```java
+// Controller层
+@DeleteMapping
+@ApiOperation("批量删除套餐")
+public Result delete(@RequestParam List<Long> ids) {
+    log.info("批量删除套餐：{}",ids);
+    setmealService.deleteBatch(ids);
+    return Result.success();
+}
+
+// Service层
+@Override
+@Transactional
+public void deleteBatch(List<Long> ids) {
+    // 1. 判断套餐状态
+    for (Long id : ids) {
+        Setmeal setmeal = setmealMapper.getById(id);
+        if (setmeal.getStatus() == StatusConstant.ENABLE) {
+            // 起售中的套餐不能删除
+            throw new DeletionNotAllowedException(MessageConstant.SETMEAL_ON_SALE);
+        }
+    }
+
+    // 2. 删除套餐
+    setmealMapper.deleteByIds(ids);
+
+    // 3. 删除套餐关联的菜品数据
+    setmealDishMapper.deleteBySetmealIds(ids);
+}
+
+// Mapper层
+void deleteByIds(List<Long> ids);
+
+// XML映射文件
+<delete id="deleteByIds">
+    delete from setmeal where id in
+    <foreach item="id" collection="ids" open="(" separator="," close=")">
+        #{id}
+    </foreach>
+</delete>
+```
+
+**技术亮点**:
+- ✨ **事务管理**: 使用@Transactional确保套餐和菜品数据同时删除
+- ✨ **业务校验**: 删除前检查套餐状态
+- ✨ **批量删除**: 使用MyBatis foreach实现批量删除
+- ✨ **异常处理**: 对不允许删除的情况抛出业务异常
+- ✨ **数据完整性**: 保证主表和关联表数据的一致性
+
 ## 关键技术点
 
 ### 1. JWT 认证机制
@@ -611,14 +840,15 @@ void update(Dish dish);
 - ✅ 5月6日: 菜品分页查询功能
 - ✅ 5月6日: 菜品删除功能
 - ✅ 5月8日: 菜品修改功能（含口味管理）
+- ✅ 5月17日: 套餐新增功能（含菜品管理）
+- ✅ 5月17日: 套餐分页查询功能
+- ✅ 5月17日: 套餐删除功能
 
 ### 待开发功能
-- ⏳ 菜品查询功能
-- ⏳ 菜品修改功能
-- ⏳ 菜品删除功能
+- ⏳ 套餐修改功能
+- ⏳ 套餐查询功能
 - ⏳ 员工删除功能
 - ⏳ 密码修改功能
-- ⏳ 套餐管理模块
 - ⏳ 订单管理模块
 - ⏳ 数据统计模块
 
@@ -669,6 +899,14 @@ http://localhost:8080/doc.html
 5. **数据校验**: 前端和后端都需要进行数据校验
 
 ## 更新日志
+
+### 2026-05-17
+- ✨ 新增：套餐新增功能（支持菜品管理）
+- ✨ 新增：套餐分页查询功能（支持多条件筛选）
+- ✨ 新增：套餐删除功能（支持批量删除）
+- 🔧 实现：事务控制保证套餐和菜品数据一致性
+- 📝 完善：批量插入套餐菜品数据提高性能
+- 🎯 应用：继续使用AOP自动填充审计字段
 
 ### 2026-05-08
 - ✨ 新增：菜品修改功能（支持口味数据更新）

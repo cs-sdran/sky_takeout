@@ -28,6 +28,7 @@
         order by d.update_time desc
     </select>
 
+
     <delete id="deleteByIds">
         delete from dish where id in
         <foreach item="id" collection="ids" open="(" separator="," close=")">
@@ -73,5 +74,18 @@
         where id = #{id}
     </update>
 
+
+    <select id="list" resultType="com.sky.entity.Dish">
+        select *from dish
+        <where>
+            <if test="name != null and name != ''">
+                and name like CONCAT('%', #{name}, '%')
+            </if>
+            <if test="status != null">
+                and status = #{status}
+            </if>
+        </where>
+        order by update_time desc
+    </select>
 
 </mapper>
