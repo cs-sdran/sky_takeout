@@ -843,14 +843,80 @@ void deleteByIds(List<Long> ids);
 - ✅ 5月17日: 套餐新增功能（含菜品管理）
 - ✅ 5月17日: 套餐分页查询功能
 - ✅ 5月17日: 套餐删除功能
+- ✅ 5月18日: 套餐修改功能（含菜品管理）
 
-### 待开发功能
-- ⏳ 套餐修改功能
-- ⏳ 套餐查询功能
-- ⏳ 员工删除功能
-- ⏳ 密码修改功能
-- ⏳ 订单管理模块
-- ⏳ 数据统计模块
+#### 3.4 套餐修改 ⭐⭐ (5月18日完成)
+- **接口路径**: `PUT /admin/setmeal`
+- **功能描述**: 管理员修改套餐基本信息和关联的菜品数据
+- **涉及表**: 
+  - `setmeal`: 套餐基本信息表
+  - `setmeal_dish`: 套餐菜品关系表
+- **请求参数**:
+  - id: 套餐ID
+  - name: 套餐名称
+  - categoryId: 套餐分类ID
+  - price: 套餐价格
+  - image: 套餐图片URL
+  - description: 套餐描述
+  - status: 套餐状态（0-停售，1-起售）
+  - setmealDishes: 套餐菜品列表
+    - dishId: 菜品ID
+    - name: 菜品名称
+    - price: 菜品单价
+    - copies: 份数
+- **业务规则**:
+  - 使用事务保证数据一致性
+  - 先更新套餐基本信息，再删除原有菜品关联数据，最后插入新的菜品关联数据
+  - 自动填充更新时间、更新人等审计字段
+
+**实现细节**:
+```java
+// Controller层
+@PutMapping
+@ApiOperation("修改套餐")
+public Result update(@RequestBody SetmealDTO setmealDTO) {
+    log.info("更新套餐");
+    setmealService.update(setmealDTO);
+    return Result.success();
+}
+
+// Service层
+@Override
+@Transactional
+public void update(SetmealDTO setmealDTO) {
+    Setmeal setmeal = new Setmeal();
+    BeanUtils.copyProperties(setmealDTO, setmeal);
+
+    //1、修改套餐表，执行update
+    setmealMapper.update(setmeal);
+
+
+    //套餐id
+    Long setmealId = setmealDTO.getId();
+
+    //2、删除套餐和菜品的关联关系，操作setmeal_dish表，执行delete
+    setmealDishMapper.deleteBySetmealId(setmealId);
+
+    List<SetmealDish> setmealDishes = setmealDTO.getSetmealDishes();
+    setmealDishes.forEach(setmealDish -> {
+        setmealDish.setSetmealId(setmealId);
+    });
+    //3、重新插入套餐和菜品的关联关系，操作setmeal_dish表，执行insert
+    setmealDishMapper.insertBatch(setmealDishes);
+}
+
+// Mapper层
+@AutoFill(value = OperationType.UPDATE)
+void update(Setmeal setmeal);
+```
+
+**技术亮点**:
+- ✨ **事务管理**: 使用@Transactional注解确保套餐和菜品数据的一致性
+- ✨ **先删后增**: 采用先删除原有菜品关联再插入新关联的方式简化逻辑
+- ✨ **批量操作**: 套餐菜品数据采用批量插入提高性能
+- ✨ **自动填充**: 利用AOP自动填充审计字段，减少重复代码
+- ✨ **数据传输对象**: 使用SetmealDTO接收前端复杂数据结构
+- ✨ **属性拷贝**: 使用BeanUtils简化DTO到Entity的转换
 
 ## 运行环境
 - JDK 8+
@@ -899,6 +965,12 @@ http://localhost:8080/doc.html
 5. **数据校验**: 前端和后端都需要进行数据校验
 
 ## 更新日志
+
+### 2026-05-18
+- ✨ 新增：套餐修改功能（支持菜品管理）
+- 🔧 实现：先删后增策略处理套餐菜品关联变更
+- 📝 完善：事务控制保证套餐和菜品数据一致性
+- 🎯 应用：继续使用AOP自动填充审计字段
 
 ### 2026-05-17
 - ✨ 新增：套餐新增功能（支持菜品管理）
@@ -951,4 +1023,4 @@ http://localhost:8080/doc.html
 
 ---
 
-**最后更新**: 2026-05-08
+**最后更新**: 2026-05-18
