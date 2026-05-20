@@ -922,7 +922,7 @@ void update(Setmeal setmeal);
 - JDK 8+
 - Maven 3.6+
 - MySQL 5.7+
-- Redis (可选，用于缓存)
+- Redis 6.0+ (已配置，用于缓存和数据存储)
 
 ## 快速开始
 
@@ -965,6 +965,12 @@ http://localhost:8080/doc.html
 5. **数据校验**: 前端和后端都需要进行数据校验
 
 ## 更新日志
+
+### 2026-05-20
+- ✨ 新增：Redis 准备工作完成
+- 🔧 集成：Spring Data Redis 依赖和配置
+- 📝 完善：Redis 工具类开发和测试验证
+- 🎯 应用：为后续缓存功能奠定基础
 
 ### 2026-05-18
 - ✨ 新增：套餐修改功能（支持菜品管理）
@@ -1023,4 +1029,11 @@ http://localhost:8080/doc.html
 
 ---
 
-**最后更新**: 2026-05-18
+**最后更新**: 2026-05-20
+
+
+常用redis命令
+set key value 
+get key
+setex key seconds value
+setnx key value
