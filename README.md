@@ -844,6 +844,7 @@ void deleteByIds(List<Long> ids);
 - ✅ 5月17日: 套餐分页查询功能
 - ✅ 5月17日: 套餐删除功能
 - ✅ 5月18日: 套餐修改功能（含菜品管理）
+- ✅ 5月21日: 店铺营业状态管理功能（Redis实现）
 
 #### 3.4 套餐修改 ⭐⭐ (5月18日完成)
 - **接口路径**: `PUT /admin/setmeal`
@@ -918,6 +919,69 @@ void update(Setmeal setmeal);
 - ✨ **数据传输对象**: 使用SetmealDTO接收前端复杂数据结构
 - ✨ **属性拷贝**: 使用BeanUtils简化DTO到Entity的转换
 
+### 4. 店铺管理模块
+
+#### 4.1 店铺营业状态管理 ⭐⭐ (5月21日完成)
+- **接口路径**: `PUT /admin/shop/status`
+- **功能描述**: 管理员设置店铺营业或打烊状态
+- **存储方式**: 使用 Redis 缓存存储店铺状态
+- **请求参数**:
+  - status: 店铺状态（1-营业中，0-打烊中）
+- **业务规则**:
+  - 状态存储在 Redis 中，key 为 "SHOP_STATUS"
+  - 用户端可实时获取店铺营业状态
+  - 利用 Redis 高性能特性提升查询效率
+
+**实现细节**:
+```java
+// Controller层
+@RestController("adminShopController")
+@RequestMapping("/admin/shop")
+@Api(tags = "店铺相关接口")
+@Slf4j
+public class ShopController {
+    @Autowired
+    private ShopService shopService;
+
+    /**
+     * 设置店铺营业状态
+     */
+    @PutMapping("/status")
+    @ApiOperation("设置店铺营业状态")
+    public Result setStatus(@RequestParam Integer status){
+        log.info("设置店铺的营业状态为：{}", status == 1 ? "营业中" : "打烊中");
+        shopService.setStatus(status);
+        return Result.success();
+    }
+}
+
+// Service层
+@Service
+@Slf4j
+public class ShopServiceImpl implements ShopService {
+    @Autowired
+    private StringRedisTemplate stringRedisTemplate;
+
+    public static final String KEY = "SHOP_STATUS";
+
+    /**
+     * 设置店铺营业状态
+     * @param status
+     */
+    @Override
+    public void setStatus(Integer status) {
+        stringRedisTemplate.opsForValue().set(KEY, status.toString());
+    }
+}
+```
+
+**技术亮点**:
+- ✨ **Redis存储**: 使用 Redis 存储店铺状态，提高读写性能
+- ✨ **实时同步**: 状态变更立即生效，用户端可实时获取最新状态
+- ✨ **简洁高效**: 通过 StringRedisTemplate 简单操作 Redis
+- ✨ **常量管理**: 使用常量统一管理 Redis key
+- ✨ **日志记录**: 关键操作记录详细日志便于追踪
+
 ## 运行环境
 - JDK 8+
 - Maven 3.6+
@@ -965,6 +1029,12 @@ http://localhost:8080/doc.html
 5. **数据校验**: 前端和后端都需要进行数据校验
 
 ## 更新日志
+
+### 2026-05-21
+- ✨ 新增：使用 Redis 实现店铺营业/打烊状态管理
+- 🔧 实现：通过 Redis 存储和读取店铺营业状态
+- 📝 完善：提供接口供管理员设置店铺营业状态
+- 🎯 应用：利用 Redis 高性能特性提升状态查询效率
 
 ### 2026-05-20
 - ✨ 新增：Redis 准备工作完成
@@ -1029,7 +1099,7 @@ http://localhost:8080/doc.html
 
 ---
 
-**最后更新**: 2026-05-20
+**最后更新**: 2026-05-21
 
 
 常用redis命令
