@@ -42,6 +42,8 @@ public interface DishService {
      * 修改菜品，同时修改对应的口味数据
      * @param dishDTO
      */
+
+
     void updateWithFlavor(DishDTO dishDTO);
 
     /**
@@ -57,4 +59,7 @@ public interface DishService {
      * @return
      */
     List<DishVO> listWithFlavor(Dish dish);
+
+
+    void startOrStop(Integer status, Long id);
 }

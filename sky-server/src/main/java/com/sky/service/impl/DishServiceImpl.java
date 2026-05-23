@@ -174,5 +174,13 @@ public class DishServiceImpl implements DishService {
         return dishVOList;
     }
 
+    @Override
+    public void startOrStop(Integer status, Long id) {
+        if(status == StatusConstant.ENABLE)
+            dishMapper.updateStatus(StatusConstant.ENABLE,id);
+            else
+            dishMapper.updateStatus(StatusConstant.DISABLE,id);
+    }
+
 
 }
