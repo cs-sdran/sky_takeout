@@ -12,4 +12,6 @@ public interface OrderDetailMapper {
      * @param orderDetails
      */
     void insertBatch(List<OrderDetail> orderDetails);
+
+    List<OrderDetail> getByOrderId(Long orderId);
 }
