@@ -8,6 +8,7 @@ import com.sky.result.PageResult;
 import com.sky.vo.OrderPaymentVO;
 import com.sky.vo.OrderStatisticsVO;
 import com.sky.vo.OrderSubmitVO;
+import com.sky.vo.OrderVO;
 
 public interface OrderService {
 
@@ -35,7 +36,34 @@ public interface OrderService {
      */
     PageResult historyOrders(Integer page, Integer pageSize,Integer status);
 
+    /**
+     * 条件搜索订单
+     * @param ordersPageQueryDTO
+     * @return
+     */
     PageResult conditionSearch(OrdersPageQueryDTO ordersPageQueryDTO);
 
+    /**
+     * 统计
+     * @return
+     */
     OrderStatisticsVO statistics();
+    /**
+     * 订单详情
+     * @param id
+     * @return
+     */
+    OrderVO orderDetail(long id);
+
+    /**
+     * 取消订单
+     * @param id
+     */
+    void cancel(long id);
+
+    /**
+     * 再来一单
+     * @param id
+     */
+    void repetition(long id);
 }
