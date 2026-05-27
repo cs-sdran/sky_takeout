@@ -27,11 +27,7 @@ public interface ShoppingCartMapper {
     @Select("select * from shopping_cart where user_id = #{userId}")
     ShoppingCart getByUserId(long uerId);
 
-    /**
-     * 批量插入购物车数据
-     *
-     * @param shoppingCartList
-     */
-    void insertBatch(List<ShoppingCart> shoppingCartList);
+    void insertBatch(@Param("shoppingCartList") List<ShoppingCart> shoppingCartList);
+
 
 }

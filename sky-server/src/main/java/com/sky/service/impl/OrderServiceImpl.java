@@ -6,10 +6,7 @@ import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import com.sky.constant.MessageConstant;
 import com.sky.context.BaseContext;
-import com.sky.dto.OrdersDTO;
-import com.sky.dto.OrdersPageQueryDTO;
-import com.sky.dto.OrdersPaymentDTO;
-import com.sky.dto.OrdersSubmitDTO;
+import com.sky.dto.*;
 import com.sky.entity.*;
 import com.sky.exception.AddressBookBusinessException;
 import com.sky.exception.OrderBusinessException;
@@ -274,26 +271,49 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     public void repetition(long id) {//传入的Id是订单id
-        // 查询当前用户id
-        Long userId = BaseContext.getCurrentId();
+       //获取当前用户id
+        long userId=BaseContext.getCurrentId();
+        //查询订单明细信息
+        List<OrderDetail> orderDetailList=orderDetailMapper.getByOrderId(id);
 
-        // 根据订单id查询当前订单详情
-        List<OrderDetail> orderDetailList = orderDetailMapper.getByOrderId(id);
-
-        // 将订单详情对象转换为购物车对象
-        List<ShoppingCart> shoppingCartList = orderDetailList.stream().map(x -> {
+        //新建一个购物车列表
+        List<ShoppingCart> shoppingCartList=new ArrayList<>();
+      shoppingCartList=  orderDetailList.stream().map(x->{
             ShoppingCart shoppingCart = new ShoppingCart();
-
-            // 将原订单详情里面的菜品信息重新复制到购物车对象中
-            BeanUtils.copyProperties(x, shoppingCart, "id");
+            BeanUtils.copyProperties(x,shoppingCart,"id");
             shoppingCart.setUserId(userId);
             shoppingCart.setCreateTime(LocalDateTime.now());
+
 
             return shoppingCart;
         }).collect(Collectors.toList());
 
-        // 将购物车对象批量添加到数据库
         shoppingCartMapper.insertBatch(shoppingCartList);
+    }
+
+    @Override
+    public OrderVO details(Long id) {
+        Orders orders = new Orders();
+        orders=orderMapper.getById(id);
+        OrderVO orderVO = new OrderVO();
+        List<OrderDetail> orderDetailList = orderDetailMapper.getByOrderId(id);
+        orderVO.setOrderDetailList(orderDetailList);
+        BeanUtils.copyProperties(orders,orderVO);
+        return orderVO;
+    }
+
+    /**
+     * 接单
+     *
+     * @param ordersConfirmDTO
+     */
+    public void confirm(OrdersConfirmDTO ordersConfirmDTO) {
+        Orders orders = Orders.builder()
+                .id(ordersConfirmDTO.getId())
+                .status(Orders.CONFIRMED)
+                .build();
+
+        orderMapper.update(orders);
     }
 
 }

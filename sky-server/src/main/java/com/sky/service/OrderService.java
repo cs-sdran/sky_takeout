@@ -1,6 +1,7 @@
 package com.sky.service;
 
 import com.github.pagehelper.Page;
+import com.sky.dto.OrdersConfirmDTO;
 import com.sky.dto.OrdersPageQueryDTO;
 import com.sky.dto.OrdersPaymentDTO;
 import com.sky.dto.OrdersSubmitDTO;
@@ -66,4 +67,13 @@ public interface OrderService {
      * @param id
      */
     void repetition(long id);
+
+    /**
+     * 订单详情
+     * @param id
+     * @return
+     */
+    OrderVO details(Long id);
+
+    void confirm(OrdersConfirmDTO ordersConfirmDTO);
 }

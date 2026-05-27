@@ -43,4 +43,6 @@ public interface OrderMapper {
 
     @Update("update status from orders where  id=#{id}")
     void cancel(long id);
+
+
 }
