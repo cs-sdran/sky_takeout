@@ -6,9 +6,14 @@ import com.sky.dto.OrdersPageQueryDTO;
 import com.sky.entity.Orders;
 import com.sky.vo.OrderVO;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 import org.springframework.core.annotation.Order;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
 
 @Mapper
 public interface OrderMapper {
@@ -44,5 +49,12 @@ public interface OrderMapper {
     @Update("update status from orders where  id=#{id}")
     void cancel(long id);
 
-
+    @Select("select * from orders where status =#{status} and order_time < #{orderTime}")
+    List<Orders> getByStatusAndOrderTimeLT(Integer status, LocalDateTime orderTime);
+    /**
+     * 根据状态统计订单数量
+     * @param map
+     * @return
+     */
+    Double sumByMap(Map map);
 }
